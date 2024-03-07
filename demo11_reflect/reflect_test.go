@@ -1,4 +1,4 @@
-package 接口与反射
+package demo11_reflect
 
 import (
 	"fmt"

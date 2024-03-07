@@ -1,8 +1,11 @@
-package 接口与反射
+package demo11_interface
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"testing"
 )
 
@@ -77,11 +80,61 @@ if v, ok := varI.(T); ok {  // checked type assertion
 
 // 实战:使用Sorted排序(Demo8)
 
+// 实战:Go的动态类型(Demo9)
+/*
+1:Go 没有类：数据（结构体或更一般的类型）和方法是一种松耦合的正交关系。
+2:Go 中的接口跟 Java/C# 类似：都是必须提供一个指定方法集的实现。但是更加灵活通用：任何提供了接口方法实现代码的类型都隐式地实现了该接口，而不用显式地声明。
+3:和其它语言相比，Go 是唯一结合了接口值，静态类型检查（是否该类型实现了某个接口），运行时动态转换的语言，并且不需要显式地声明类型是否满足某个接口。该特性允许我们在不改变已有的代码的情况下定义和使用新接口。
+4:接收一个（或多个）接口类型作为参数的函数，其实参可以是任何实现了该接口的类型的变量。 实现了某个接口的类型可以被传给任何以此接口为参数的函数。
+5:类似于 Python 和 Ruby 这类动态语言中的动态类型 (duck typing)；这意味着对象可以根据提供的方法被处理（例如，作为参数传递给函数），而忽略它们的实际类型：它们能做什么比它们是什么更重要。
+*/
+
+// 实战:动态方法调用(Demo10)
+/*
+1:当变量被赋值给一个接口类型的变量时，编译器会检查其是否实现了该接口的所有函数。
+2:如果方法调用作用于像 interface{} 这样的“泛型”上，你可以通过类型断言（参见 11.3 节）来检查变量是否实现了相应接口。
+*/
+
+// 实战:接口的提取(Demo1)
+/*
+你不用提前设计出所有的接口；
+整个设计可以持续演进，而不用废弃之前的决定。类型要实现某个接口，它本身不用改变，你只需要在这个类型上实现新的方法
+*/
+
+// 实战:接口的继承(Demo11)
+/*
+当一个类型包含（内嵌）另一个类型（实现了一个或多个接口）的指针时，这个类型就可以使用（另一个类型）所有的接口方法。
+*/
+
+// 实战:结构体、集合和高阶函数(Demo12)
+/*
+高阶函数，实际上也就是把函数作为定义所需方法（其他函数）的参数
+*/
+
+// 总结
+/*
+我们总结一下前面看到的：Go 没有类，而是松耦合的类型、方法对接口的实现。
+OO 语言最重要的三个方面分别是：封装、继承和多态，在 Go 中它们是怎样表现的呢？
+	封装（数据隐藏）：和别的 OO 语言有 4 个或更多的访问层次相比，Go 把它简化为了 2 层（参见 4.2 节的可见性规则）:
+		1）包范围内的：通过标识符首字母小写，对象只在它所在的包内可见
+		2）可导出的：通过标识符首字母大写，对象对所在包以外也可见
+类型只拥有自己所在包中定义的方法。
+	继承：用组合实现：内嵌一个（或多个）包含想要的行为（字段和方法）的类型；多重继承可以通过内嵌多个类型实现
+	多态：用接口实现：某个类型的实例可以赋给它所实现的任意接口类型的变量。类型和接口是松耦合的，并且多重继承可以通过实现多个接口实现。
+		           Go 接口不是 Java 和 C# 接口的变体，而且接口间是不相关的，并且是大规模编程和可适应的演进型设计的关键。
+*/
+
 // Demo1
 // Shaper 图形
 type Shaper interface {
 	// Area 面积
 	Area() float32
+}
+
+// TopologicalGenus 拓扑级
+type TopologicalGenus interface {
+	// Rank 等级
+	Rank() int
 }
 
 // Square 正方形
@@ -94,6 +147,10 @@ func (s *Square) Area() float32 {
 	return s.Side * s.Side
 }
 
+func (s *Square) Rank() int {
+	return 1
+}
+
 // Rectangle 长方形
 type Rectangle struct {
 	// 长，宽
@@ -104,6 +161,10 @@ func (r Rectangle) Area() float32 {
 	return r.Length * r.Width
 }
 
+func (r Rectangle) Rank() int {
+	return 2
+}
+
 func TestShaper(t *testing.T) {
 	squarePointer := &Square{Side: 4.5}
 	rectangle := Rectangle{Length: 4.5, Width: 5.5}
@@ -112,6 +173,11 @@ func TestShaper(t *testing.T) {
 	for _, shaper := range shapers {
 		area := shaper.Area()
 		fmt.Printf("square area is %f \n", area)
+	}
+
+	topologicalGenus := []TopologicalGenus{squarePointer, rectangle}
+	for _, topology := range topologicalGenus {
+		fmt.Println(topology.Rank())
 	}
 }
 
@@ -344,4 +410,108 @@ func TestIntArray(t *testing.T) {
 	intSlice := IntArray{3, 5, 6, 2, 1}
 	Sort(intSlice)
 	fmt.Println(intSlice)
+}
+
+// Demo9:Go的动态类型
+type IDuck interface {
+	Quack()
+	Walk()
+}
+
+func DuckDance(duck IDuck) {
+	for i := 1; i <= 3; i++ {
+		duck.Quack()
+		duck.Walk()
+	}
+}
+
+type Bird struct {
+}
+
+func (b Bird) Quack() {
+	fmt.Println("I am quacking")
+}
+
+func (b Bird) Walk() {
+	fmt.Println("I am walking")
+}
+
+func TestDuck(t *testing.T) {
+	b := Bird{}
+	DuckDance(b)
+}
+
+// Demo10:动态方法调用
+type xmlWriter interface {
+	WriteXML(w io.Writer) error
+}
+
+func StreamXml(v any, w io.Writer) error {
+	if xw, ok := v.(xmlWriter); ok {
+		return xw.WriteXML(w)
+	}
+	return EncodeToXML(v, w)
+}
+
+func EncodeToXML(v any, w io.Writer) error {
+	return nil
+}
+
+// Demo11:接口的继承
+type Task struct {
+	Command string
+	*log.Logger
+}
+
+func NewTask(command string, logger *log.Logger) *Task {
+	return &Task{command, logger}
+}
+
+// 当 log.Logger 实现了 Log() 方法后，Task 的实例 task 就可以调用该方法：
+//task.Log()
+//类型可以通过继承多个接口来提供像多重继承一样的特性：
+//type ReaderWriter struct {
+//	*io.Reader
+//	*io.Writer
+//}
+
+// Demo12:结构体、集合和高阶函数
+type Car struct {
+	Module       string
+	Manufacturer string
+	BuildYear    int
+}
+
+type Cars []*Car
+
+func (cs Cars) Process(f func(c *Car)) {
+	for _, c := range cs {
+		f(c)
+	}
+}
+
+func (cs Cars) FindAll(f func(c *Car) bool) Cars {
+	cars := make([]*Car, 0)
+
+	cs.Process(func(c *Car) {
+		if f(c) {
+			cars = append(cars, c)
+		}
+	})
+
+	return cars
+}
+
+func TestCar(t *testing.T) {
+	cars := Cars{
+		&Car{Module: "1", Manufacturer: "BMW", BuildYear: 2024},
+		&Car{Module: "1", Manufacturer: "BYD", BuildYear: 2024},
+	}
+
+	all := cars.FindAll(func(c *Car) bool {
+		return c.Manufacturer == "BYD" && c.BuildYear > 2020
+	})
+
+	marshal, _ := json.Marshal(all)
+	fmt.Println(string(marshal))
 }
