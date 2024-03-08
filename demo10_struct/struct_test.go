@@ -2,6 +2,7 @@ package demo10_struct
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -63,6 +64,39 @@ Go 中实现 “构造子工厂”方法。为了方便通常会为类型定义�
 /*
 试图 make() 一个结构体变量，会引发一个编译错误，这还不是太糟糕，但是 new() 一个 map 并试图向其填充数据，将会引发运行时错误！
 因为 new(Foo) 返回的是一个指向 nil 的指针，它尚未被分配内存。所以在使用 map 时要特别谨慎。
+*/
+
+// 带标签的结构体(Demo7)
+/*
+1:结构体中的字段除了有名字和类型外，还可以有一个可选的标签 (tag)：它是一个附属于字段的字符串，可以是文档或其他的重要标记。
+2:标签的内容不可以在一般的编程中使用，只有包 reflect 能获取它。
+3:我们将在下一章（第 11.10 节中深入的探讨 reflect 包，它可以在运行时自省类型、属性和方法，
+比如：在一个变量上调用 reflect.TypeOf() 可以获取变量的正确类型，如果变量是一个结构体类型，就可以通过 Field 来索引结构体的字段，然后就可以使用 Tag 属性。
+*/
+
+// 匿名字段(Demo8)
+/*
+1:结构体可以包含一个或多个 匿名（或内嵌）字段，即这些字段没有显式的名字，只有字段的类型是必须的，此时类型就是字段的名字。匿名字段本身可以是一个结构体类型，即 结构体可以包含内嵌结构体。
+2:可以粗略地将这个和面向对象语言中的继承概念相比较，随后将会看到它被用来模拟类似继承的行为。Go 语言中的继承是通过内嵌或组合来实现的，所以可以说，在 Go 语言中，相比较于继承，组合更受青睐。
+3:在一个结构体中对于每一种数据类型只能有一个匿名字段。
+*/
+
+// 命名冲突(Demo9)
+/*
+10.5.3 命名冲突
+当两个字段拥有相同的名字（可能是继承来的名字）时该怎么办呢？
+	外层名字会覆盖内层名字（但是两者的内存空间都保留），这提供了一种重载字段或方法的方式；
+	如果相同的名字在同一级别出现了两次，如果这个名字被程序使用了，将会引发一个错误（不使用没关系）。没有办法来解决这种问题引起的二义性，必须由程序员自己修正。
+例子：
+	type A struct {a int}
+	type B struct {a, b int}
+	type C struct {A; B}
+	var c C
+规则 2：使用 c.a 是错误的，到底是 c.A.a 还是 c.B.a 呢？会导致编译器错误：ambiguous DOT reference c.a disambiguate with either c.A.a or c.B.a。
+
+	type D struct {B; b float32}
+	var d D
+规则1：使用 d.b 是没问题的：它是 float32，而不是 B 的 b。如果想要内层的 b 可以通过 d.B.b 得到。
 */
 
 // Demo1:结构体定义
@@ -179,4 +213,50 @@ func TestMake(t *testing.T) {
 	p := new(Person)
 	p.Name = "stars"
 	fmt.Println(p)
+}
+
+// Demo7: 带标签的结构体
+type TagType struct {
+	field  int    `hello golang`
+	field2 string `hello world`
+	field3 bool   `how much`
+}
+
+func TestTag(t *testing.T) {
+	tag := TagType{1, "test", true}
+	value := reflect.TypeOf(tag)
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Field(i)
+		fmt.Println(field.Tag)
+	}
+}
+
+// Demo8:匿名字段
+type innerS struct {
+	int1 int
+	int2 int
+}
+
+type outerS struct {
+	b int
+	c float32
+	int
+	innerS
+}
+
+func TestAnonymity(t *testing.T) {
+	var o outerS
+	o.b = 1
+	o.c = 3.14
+	o.int = 2
+	o.int1 = 3
+	o.int2 = 4
+
+	fmt.Println(o, o.b, o.c, o.int, o.int1, o.int2, o.innerS, o.innerS.int1, o.innerS.int2)
+
+	o2 := outerS{b: 1, c: 3.14, int: 2, innerS: innerS{int1: 3, int2: 4}}
+	fmt.Println(o2)
+
+	o3 := outerS{1, 3.14, 2, innerS{1, 2}}
+	fmt.Println(o3)
 }
