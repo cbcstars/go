@@ -1,7 +1,8 @@
-package demo10_struct
+package demo10_method
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -71,8 +72,38 @@ import (
 
 // 多重继承(Demo7)
 /*
+多重继承指的是类型获得多个父类型行为的能力，它在传统的面向对象语言中通常是不被实现的（C++ 和 Python 例外）。
+因为在类继承层次中，多重继承会给编译器引入额外的复杂度。但是在 Go 语言中，通过在类型中嵌入所有必要的父类型，可以很简单的实现多重继承。
+*/
 
- */
+// 类型的 String() 方法和格式化描述符
+/*
+1:如果类型定义了 String() 方法，它会被用在 fmt.Printf() 中生成默认的输出：等同于使用格式化描述符 %v 产生的输出。
+  还有 fmt.Print() 和 fmt.Println() 也会自动使用 String() 方法。
+2:当你广泛使用一个自定义类型时，最好为它定义 String()方法。从上面的例子也可以看到，格式化描述符 %T 会给出类型的完全规格，
+  %#v 会给出实例的完整输出，包括它的字段（在程序自动生成 Go 代码时也很有用）。
+3:不要在 String() 方法里面调用涉及 String() 方法的方法，它会导致意料之外的错误，
+  比如下面的例子，它导致了一个无限递归调用（TT.String() 调用 fmt.Sprintf，而 fmt.Sprintf 又会反过来调用 TT.String()），很快就会导致内存溢出
+*/
+
+// 垃圾回收和SetFinalizer
+/*
+1:Go 开发者不需要写代码来释放程序中不再使用的变量和结构占用的内存，在 Go 运行时中有一个独立的进程，即垃圾收集器 (GC)，会处理这些事情，它搜索不再使用的变量然后释放它们的内存。
+  可以通过 runtime 包访问 GC 进程。
+2:通过调用 runtime.GC() 函数可以显式的触发 GC，但这只在某些罕见的场景下才有用，比如当内存资源不足时调用 runtime.GC()，
+  它会在此函数执行的点上立即释放一大片内存，此时程序可能会有短时的性能下降（因为 GC 进程在执行）。
+3:如果想知道当前的内存状态，可以使用：
+	// fmt.Printf("%d\n", runtime.MemStats.Alloc/1024)
+	// 此处代码在 Go 1.5.1下不再有效，更正为
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	fmt.Printf("%d Kb\n", m.Alloc / 1024)
+	上面的程序会给出已分配内存的总量，单位是 Kb。进一步的测量参考 文档页面。
+4:如果需要在一个对象 obj 被从内存移除前执行一些特殊操作，比如写到日志文件中，可以通过如下方式调用函数来实现：
+	runtime.SetFinalizer(obj, func(obj *typeObj))
+	func(obj *typeObj) 需要一个 typeObj 类型的指针参数 obj，特殊操作会在它上面执行。func 也可以是一个匿名函数。
+	在对象被 GC 进程选中并从内存中移除以前，SetFinalizer 都不会执行，即使程序正常结束或者发生错误。
+*/
 
 // Demo1
 type TwoInt struct {
@@ -283,4 +314,44 @@ func TestAS(t *testing.T) {
 	as.MethodA()
 	as.MethodB()
 	as.MethodC()
+}
+
+// Demo7:多重继承
+type Camera struct{}
+
+func (c *Camera) TakeAPicture() string {
+	return "Click"
+}
+
+type Phone struct{}
+
+func (p *Phone) Call() string {
+	return "Ring Ring"
+}
+
+type CameraPhone struct {
+	Camera
+	Phone
+}
+
+func TestCameraPhone(t *testing.T) {
+	cp := new(CameraPhone)
+	fmt.Println("Our new CameraPhone exhibits multiple behaviors...")
+	fmt.Println("It exhibits behavior of a Camera: ", cp.TakeAPicture())
+	fmt.Println("It works like a Phone too: ", cp.Call())
+}
+
+// Demo8:类型的String()方法
+type TwoInts struct {
+	a int
+	b int
+}
+
+func (t *TwoInts) String() string {
+	return "(" + strconv.Itoa(t.a) + "/" + strconv.Itoa(t.b) + ")"
+}
+
+func TestString(t *testing.T) {
+	ti := TwoInts{1, 2}
+	fmt.Println(ti.String())
 }
